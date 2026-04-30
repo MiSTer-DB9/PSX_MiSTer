@@ -172,26 +172,64 @@ module emu
 	// 2..6 - USR2..USR6
 	// Set USER_OUT to 1 to read from USER_IN.
 	output        USER_OSD,
-	output  [1:0] USER_MODE,
+	// [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: per-pin push-pull mask
+	output  [7:0] USER_PP,
+	// [MiSTer-DB9 END]
 	input   [7:0] USER_IN,
 	output  [7:0] USER_OUT,
 
 	input         OSD_STATUS
 );
 
+
+// [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: USER_PP default (port_batch replaces with USER_PP_DRIVE)
+assign USER_PP = USER_PP_DRIVE;
+// [MiSTer-DB9 END]
 assign HDMI_FREEZE = 1'b0;
 assign HDMI_BOB_DEINT = status[41];
 
 assign ADC_BUS  = 'Z;
 
-wire         CLK_JOY = CLK_50M;         //Assign clock between 40-50Mhz
-wire   [2:0] JOY_FLAG  = {status[126],status[127],status[125]}; //Assign 3 bits of status (31:29) o (63:61) o (127:125)
-wire         JOY_CLK, JOY_LOAD, JOY_SPLIT, JOY_MDSEL;
-wire   [5:0] JOY_MDIN  = JOY_FLAG[2] ? {USER_IN[6],USER_IN[3],USER_IN[5],USER_IN[7],USER_IN[1],USER_IN[2]} : '1;
-wire         JOY_DATA  = JOY_FLAG[1] ? USER_IN[5] : '1;
-//assign       USER_OUT  = JOY_FLAG[2] ? {3'b111,JOY_SPLIT,3'b111,JOY_MDSEL} : JOY_FLAG[1] ? {6'b111111,JOY_CLK,JOY_LOAD} : '1;
-assign       USER_MODE = JOY_FLAG[2:1] ;
-assign       USER_OSD  = joydb_1[10] & joydb_1[6];
+// [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: joydb wrapper
+wire         CLK_JOY = CLK_50M;                 // Assign clock between 40-50Mhz
+wire   [1:0] joy_type        = status[127:126]; // 0=Off, 1=Saturn, 2=DB9MD, 3=DB15
+wire         joy_2p          = status[125];
+wire         joy_db9md_en    = (joy_type == 2'd2);
+wire         joy_db15_en     = (joy_type == 2'd3);
+wire         joy_any_en      = |joy_type;
+// Legacy 3-bit alias for fork-specific MT32 / SNAC fallback code. Non-canonical
+// RHS variants (ext_iec_en, mt32_disable) need a hand-port — alias is raw.
+wire   [2:0] JOY_FLAG        = {joy_db9md_en, joy_db15_en, joy_2p};
+// [MiSTer-DB9 END]
+
+// [MiSTer-DB9-Pro BEGIN] - Saturn key gate
+wire         saturn_unlocked;                   // driven by hps_io UIO_DB9_KEY (0xFE)
+// [MiSTer-DB9-Pro END]
+
+// [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: joydb wrapper wires + instance
+wire   [7:0] USER_OUT_DRIVE;
+wire   [7:0] USER_PP_DRIVE;
+wire  [15:0] joydb_1, joydb_2;
+wire         joydb_1ena, joydb_2ena;
+wire  [15:0] joy_raw_payload;
+
+joydb joydb (
+  .clk             ( CLK_JOY         ),
+  .USER_IN         ( USER_IN         ),
+  .joy_type        ( joy_type        ),
+  .joy_2p          ( joy_2p          ),
+  .saturn_unlocked ( saturn_unlocked ),
+  .USER_OUT_DRIVE  ( USER_OUT_DRIVE  ),
+  .USER_PP_DRIVE   ( USER_PP_DRIVE   ),
+  .USER_OSD        ( USER_OSD        ),
+  .joydb_1         ( joydb_1         ),
+  .joydb_2         ( joydb_2         ),
+  .joydb_1ena      ( joydb_1ena      ),
+  .joydb_2ena      ( joydb_2ena      ),
+  .joy_raw         ( joy_raw_payload )
+);
+
+// [MiSTer-DB9 END]
 
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
@@ -386,7 +424,7 @@ parameter CONF_STR = {
 	"-;",
 	"O[40:39],System Type,Auto,NTSC-U,NTSC-J,PAL;",
 	"-;",
-	"O[127:126],UserIO Joystick,Off,DB9MD,DB15 ;",
+	"O[127:126],UserIO Joystick,Off,Saturn,DB9MD,DB15;",
 	"O[125],UserIO Players, 1 Player,2 Players;",
 	"O[124],Buttons Config.,Option 1,Option 2;",
 	"-;",
@@ -553,7 +591,33 @@ wire [32:0] RTC_time;
 
 wire filter_on = (status[82:81] == 2'b00) ? 1'b0 : 1'b1;
 
+// [MiSTer-DB9-Pro BEGIN] - Saturn pad → PSX shape (Start+B = Select combo, Start+C = OSD reserved)
+// Saturn helper: [12]L [11]R [10]Start [9]Z [8]Y [7]X [6]C [5]B [4]A [3:0]UDLR
+// Map: A=Cross, B=Circle, C=R2, X=Square, Y=Triangle, Z=L2, L=L1, R=R1
+wire        joy_saturn_en = (joy_type == 2'd1);
+wire        sat1_combo    = joydb_1[10] & joydb_1[5];   // Start+B
+wire        sat2_combo    = joydb_2[10] & joydb_2[5];
+wire        sat1_start    = joydb_1[10] & ~sat1_combo;  // mask Start during combo
+wire        sat1_b        = joydb_1[5]  & ~sat1_combo;  // mask B     during combo
+wire        sat2_start    = joydb_2[10] & ~sat2_combo;
+wire        sat2_b        = joydb_2[5]  & ~sat2_combo;
+// PSX bit layout: [13]R2 [12]L2 [11]R1 [10]L1 [9]Start [8]Select [7]Sq [6]Cross [5]Circle [4]Tri [3:0]RLDU
+wire [13:0] sat_psx_1 = {
+	joydb_1[6], joydb_1[9], joydb_1[11], joydb_1[12],
+	sat1_start, sat1_combo, joydb_1[7],  joydb_1[4],
+	sat1_b,     joydb_1[8], joydb_1[3:0]
+};
+wire [13:0] sat_psx_2 = {
+	joydb_2[6], joydb_2[9], joydb_2[11], joydb_2[12],
+	sat2_start, sat2_combo, joydb_2[7],  joydb_2[4],
+	sat2_b,     joydb_2[8], joydb_2[3:0]
+};
+// [MiSTer-DB9-Pro END]
+
 wire [31:0] joy_unmod = joydb_1ena ?
+	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
+	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_1)} :
+	// [MiSTer-DB9-Pro END]
 	!status[124] ? {
 		// CZSMXABYUDLR
 		(OSD_STATUS? 32'b000000 : {joydb_1[6],joydb_1[9],joydb_1[10],joydb_1[11],joydb_1[7],joydb_1[4],joydb_1[5],joydb_1[8],joydb_1[3:0]})
@@ -565,6 +629,9 @@ wire [31:0] joy_unmod = joydb_1ena ?
 : joy_unmod_USB;
 
 wire [31:0] joy2 = joydb_2ena ?
+	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
+	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_2)} :
+	// [MiSTer-DB9-Pro END]
 	!status[124] ? {
 		// CZSMXABYUDLR
 		(OSD_STATUS? 32'b000000 : {joydb_2[6],joydb_2[9],joydb_2[10],joydb_2[11],joydb_2[7],joydb_2[4],joydb_2[5],joydb_2[8],joydb_2[3:0]})
@@ -578,36 +645,8 @@ wire [31:0] joy2 = joydb_2ena ?
 wire [31:0] joy3 = joydb_2ena ? joy_unmod_USB : joydb_1ena ? joy2_USB : joy3_USB;
 wire [31:0] joy4 = joydb_2ena ? joy2_USB : joydb_1ena ? joy3_USB : joy4_USB;
 
-wire [15:0] joydb_1 = JOY_FLAG[2] ? JOYDB9MD_1 : JOY_FLAG[1] ? JOYDB15_1 : '0;
-wire [15:0] joydb_2 = JOY_FLAG[2] ? JOYDB9MD_2 : JOY_FLAG[1] ? JOYDB15_2 : '0;
-wire        joydb_1ena = |JOY_FLAG[2:1]              ;
-wire        joydb_2ena = |JOY_FLAG[2:1] & JOY_FLAG[0];
 
-//----BA 9876543210
-//----MS ZYXCBAUDLR
-reg [15:0] JOYDB9MD_1,JOYDB9MD_2;
-joy_db9md joy_db9md
-(
-  .clk       ( CLK_JOY    ), //40-50MHz
-  .joy_split ( JOY_SPLIT  ),
-  .joy_mdsel ( JOY_MDSEL  ),
-  .joy_in    ( JOY_MDIN   ),
-  .joystick1 ( JOYDB9MD_1 ),
-  .joystick2 ( JOYDB9MD_2 )
-);
 
-//----BA 9876543210
-//----LS FEDCBAUDLR
-reg [15:0] JOYDB15_1,JOYDB15_2;
-joy_db15 joy_db15
-(
-  .clk       ( CLK_JOY   ), //48MHz
-  .JOY_CLK   ( JOY_CLK   ),
-  .JOY_DATA  ( JOY_DATA  ),
-  .JOY_LOAD  ( JOY_LOAD  ),
-  .joystick1 ( JOYDB15_1 ),
-  .joystick2 ( JOYDB15_2 )
-);
 
 assign HDMI_BLACKOUT = ~status[61];
 
@@ -629,7 +668,12 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .VDNUM(4), .BLKSZ(3)) hps_io
 	.joystick_1(joy2_USB),
 	.joystick_2(joy3_USB),
 	.joystick_3(joy4_USB),
-	.joy_raw(OSD_STATUS? (joydb_1[5:0]|joydb_2[5:0]) : 6'b000000 ),
+	// [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: joy_raw
+	.joy_raw(OSD_STATUS ? joy_raw_payload : 16'b0),
+	// [MiSTer-DB9 END]
+	// [MiSTer-DB9-Pro BEGIN] - Saturn key gate
+	.saturn_unlocked(saturn_unlocked),
+	// [MiSTer-DB9-Pro END]
 	.ps2_key(ps2_key),
 
 	.status(status),
@@ -1866,9 +1910,11 @@ assign clk8Snac = bitCnt < 8 ? clk9Snac : 1'b1;
 
 always @(posedge clk_1x)
 begin
-	if (JOY_FLAG[2] || JOY_FLAG[1]) begin // FIXME Re-enable SNAC support when DB9MD or DB15 is enabled
-		USER_OUT  <= JOY_FLAG[2] ? {3'b111,JOY_SPLIT,3'b111,JOY_MDSEL} : JOY_FLAG[1] ? {6'b111111,JOY_CLK,JOY_LOAD} : '1;
+	// [MiSTer-DB9 BEGIN] - SNAC vs joydb arbitration: any DB9/Saturn mode preempts SNAC
+	if (joy_any_en) begin // FIXME Re-enable SNAC support when DB9MD or DB15 is enabled
+		USER_OUT <= USER_OUT_DRIVE;
 	end
+	// [MiSTer-DB9 END]
 	else begin
    USER_IN3_1 <= USER_IN[3];
    USER_IN4_1 <= USER_IN[4];
