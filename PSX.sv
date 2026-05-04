@@ -192,8 +192,15 @@ assign ADC_BUS  = 'Z;
 
 // [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: joydb wrapper
 wire         CLK_JOY = CLK_50M;                 // Assign clock between 40-50Mhz
-wire   [1:0] joy_type        = status[127:126]; // 0=Off, 1=Saturn, 2=DB9MD, 3=DB15
+wire   [1:0] joy_type_raw    = status[127:126]; // 0=Off, 1=Saturn, 2=DB9MD, 3=DB15
 wire         joy_2p          = status[125];
+// SNAC priority: when SNAC is enabled, neutralize UserJoy/joydb path.
+// SNAC cores override the RHS of `snac_active` with their per-core SNAC enable
+// signal (e.g. raw_serial, snac, snacPort1|snacPort2). Default 1'b0 means
+// non-SNAC cores behave identically to before. The porter preserves a custom
+// RHS across re-runs (extract_snac_active_rhs).
+wire         snac_active     = snacPort1 | snacPort2;
+wire   [1:0] joy_type        = snac_active ? 2'd0 : joy_type_raw;
 wire         joy_db9md_en    = (joy_type == 2'd2);
 wire         joy_db15_en     = (joy_type == 2'd3);
 wire         joy_any_en      = |joy_type;
@@ -1910,8 +1917,11 @@ assign clk8Snac = bitCnt < 8 ? clk9Snac : 1'b1;
 
 always @(posedge clk_1x)
 begin
-	// [MiSTer-DB9 BEGIN] - SNAC vs joydb arbitration: any DB9/Saturn mode preempts SNAC
-	if (joy_any_en) begin // FIXME Re-enable SNAC support when DB9MD or DB15 is enabled
+	// [MiSTer-DB9 BEGIN] - UserJoy (joy_any_en) drives USER_OUT when SNAC is OFF;
+	// SNAC priority over UserJoy is enforced upstream by snac_active gating
+	// joy_type to 0 (which forces joy_any_en=0), so this branch never fires
+	// while SNAC is active.
+	if (joy_any_en) begin
 		USER_OUT <= USER_OUT_DRIVE;
 	end
 	// [MiSTer-DB9 END]
