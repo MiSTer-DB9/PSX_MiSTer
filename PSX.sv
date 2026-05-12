@@ -428,9 +428,13 @@ parameter CONF_STR = {
 	"-;",
 	"O[40:39],System Type,Auto,NTSC-U,NTSC-J,PAL;",
 	"-;",
+	// [MiSTer-DB9-Pro BEGIN] - Saturn-first joy_type + 1P/2P selector
 	"O[127:126],UserIO Joystick,Off,Saturn,DB9MD,DB15;",
 	"O[125],UserIO Players, 1 Player,2 Players;",
+	// [MiSTer-DB9-Pro END]
+	// [MiSTer-DB9 BEGIN] - SNAC8 Buttons Config selector
 	"O[124],Buttons Config.,Option 1,Option 2;",
+	// [MiSTer-DB9 END]
 	"-;",
 	"D8O[48:45],Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port1,Analog Joystick,Pop'n;",
 	"D8O[52:49],Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port2,Analog Joystick,Pop'n;",
@@ -618,6 +622,7 @@ wire [13:0] sat_psx_2 = {
 };
 // [MiSTer-DB9-Pro END]
 
+// [MiSTer-DB9 BEGIN] - joydb_1 → joy_unmod with Saturn arm + Buttons Config (status[124]) selector
 wire [31:0] joy_unmod = joydb_1ena ?
 	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
 	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_1)} :
@@ -631,7 +636,9 @@ wire [31:0] joy_unmod = joydb_1ena ?
 		(OSD_STATUS? 32'b000000 : {joydb_1[6],1'b0,joydb_1[9],1'b0,joydb_1[10],joydb_1[11],joydb_1[7],joydb_1[4],joydb_1[5],joydb_1[8],joydb_1[3:0]})
 	}
 : joy_unmod_USB;
+// [MiSTer-DB9 END]
 
+// [MiSTer-DB9 BEGIN] - joydb_2 → joy2 with Saturn arm + Buttons Config (status[124]) selector
 wire [31:0] joy2 = joydb_2ena ?
 	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
 	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_2)} :
@@ -645,9 +652,12 @@ wire [31:0] joy2 = joydb_2ena ?
 		(OSD_STATUS? 32'b000000 : {joydb_2[6],1'b0,joydb_2[9],1'b0,joydb_2[10],joydb_2[11],joydb_2[7],joydb_2[4],joydb_2[5],joydb_2[8],joydb_2[3:0]})
 	}
 : joydb_1ena ? joy_unmod_USB : joy2_USB;
+// [MiSTer-DB9 END]
 
+// [MiSTer-DB9 BEGIN] - joydb_*ena → joy3/joy4 USB pass-through shuffle
 wire [31:0] joy3 = joydb_2ena ? joy_unmod_USB : joydb_1ena ? joy2_USB : joy3_USB;
 wire [31:0] joy4 = joydb_2ena ? joy2_USB : joydb_1ena ? joy3_USB : joy4_USB;
+// [MiSTer-DB9 END]
 
 
 
