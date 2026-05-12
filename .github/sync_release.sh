@@ -8,13 +8,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/retry.sh"
 
 UPSTREAM_REPO="https://github.com/MiSTer-devel/PSX_MiSTer"
-CORE_NAME=(PSX)
+CORE_NAME=(PSX PSX_DualSDRAM)
 MAIN_BRANCH="main"
-COMPILATION_INPUT=(PSX.qsf)
-COMPILATION_OUTPUT=(output_files/PSX.rbf)
+COMPILATION_INPUT=(PSX.qsf PSX_DualSDRAM.qsf)
+COMPILATION_OUTPUT=(output_files/PSX.rbf output_files/PSX_DualSDRAM.rbf)
 QUARTUS_IMAGE="${QUARTUS_IMAGE:?QUARTUS_IMAGE env not set — populated by workflow Resolve-Quartus-image step}"
 # [MiSTer-DB9 BEGIN] - 1 → exit after merge+push so release_v2.yml builds.
-RELEASE_V2_MODE="0"
+RELEASE_V2_MODE="1"
 # [MiSTer-DB9 END]
 
 # [MiSTer-DB9 BEGIN] - fork-only cores have no upstream; sync_release is a no-op

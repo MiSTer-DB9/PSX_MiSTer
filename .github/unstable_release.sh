@@ -33,10 +33,10 @@ source "${SCRIPT_DIR}/rerere_train.sh"
 source "${SCRIPT_DIR}/compute_source_hash.sh"
 
 UPSTREAM_REPO="https://github.com/MiSTer-devel/PSX_MiSTer"
-CORE_NAME=(PSX)
+CORE_NAME=(PSX PSX_DualSDRAM)
 MAIN_BRANCH="main"
-COMPILATION_INPUT=(PSX.qsf)
-COMPILATION_OUTPUT=(output_files/PSX.rbf)
+COMPILATION_INPUT=(PSX.qsf PSX_DualSDRAM.qsf)
+COMPILATION_OUTPUT=(output_files/PSX.rbf output_files/PSX_DualSDRAM.rbf)
 QUARTUS_IMAGE="${QUARTUS_IMAGE:?QUARTUS_IMAGE env not set — populated by workflow Resolve-Quartus-image step}"
 GITHUB_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN env not set — required for gh release upload}"
 
