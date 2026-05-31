@@ -197,6 +197,12 @@ wire         joy_2p          = status[125];
 // SNAC cores: replace 1'b0 with the core's SNAC enable expression so SNAC
 // preempts the joydb wrapper on shared USER_IO pins. Default 1'b0 is no-op.
 wire         snac_active     = snacPort1 | snacPort2;
+// MT32-pi probe-suppression gate. Auto-detected from MT32 signals declared
+// elsewhere in this file (mt32_disable / mt32_use / mt32_on_primary). Hand-edit
+// if the heuristic missed your core's gate expression. Suppresses the OSD-open
+// autodetect probe so it doesn't read the RPi's I2C master traffic as a ghost
+// Saturn signature. See the fork hazard notes.
+wire         mt32_primary_active = 1'b0;
 wire   [1:0] joy_type        = snac_active ? 2'd0 : joy_type_raw;
 wire         joy_db9md_en    = (joy_type == 2'd2);
 wire         joy_db15_en     = (joy_type == 2'd3);
@@ -220,6 +226,9 @@ wire  [15:0] joy_raw_payload;
 joydb joydb (
   .clk             ( CLK_JOY         ),
   .USER_IN         ( USER_IN         ),
+  .OSD_STATUS          ( OSD_STATUS          ),
+  .snac_active         ( snac_active         ),
+  .mt32_primary_active ( mt32_primary_active ),
   .joy_type        ( joy_type        ),
   .joy_2p          ( joy_2p          ),
   .saturn_unlocked ( saturn_unlocked ),
@@ -438,6 +447,9 @@ parameter CONF_STR = {
 	"-;",
 	"D8O[48:45],Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port1,Analog Joystick,Pop'n;",
 	"D8O[52:49],Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port2,Analog Joystick,Pop'n;",
+	// [MiSTer-DB9 BEGIN] - Swap Joysticks (SNAC)
+	"D8O[123],Swap Joysticks,No,Yes;",
+	// [MiSTer-DB9 END]
 	"D8h0O[66],SNAC MemCard,Virtual,Real;",
 	"D8hFO[91],NeGcon Rumble,Off,On;",
 	"D8h2O[9],Show Crosshair,Off,On;",
@@ -572,6 +584,10 @@ wire [19:0] joy_unmod_USB;
 wire [19:0] joy2_USB;
 wire [19:0] joy3_USB;
 wire [19:0] joy4_USB;
+
+// [MiSTer-DB9 BEGIN] - Swap Joysticks (SNAC) — swaps physical SNAC SEL lines
+wire joy_swap = status[123];
+// [MiSTer-DB9 END]
 
 wire [10:0] ps2_key;
 
@@ -1943,8 +1959,10 @@ begin
    ackglitch  <= ~USER_IN3_1 && ~USER_IN3_2 && ~USER_IN3_3 && ~USER_IN3_4 ? 1'b0 : 1'b1;
 
 	if (snacPort1 || snacPort2) begin
-		USER_OUT[0] <= ~selectedPort2Snac;
-		USER_OUT[1] <= ~selectedPort1Snac;
+		// [MiSTer-DB9 BEGIN] - Swap Joysticks (SNAC): swap physical SEL lines
+		USER_OUT[0] <= joy_swap ? ~selectedPort1Snac : ~selectedPort2Snac;
+		USER_OUT[1] <= joy_swap ? ~selectedPort2Snac : ~selectedPort1Snac;
+		// [MiSTer-DB9 END]
 		USER_OUT[2] <= Cmd;
 		USER_OUT[3] <= 1'b1; //ACK
 		USER_OUT[4] <= 1'b1; //DAT
