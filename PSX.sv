@@ -1981,7 +1981,11 @@ begin
 		end
 	end
 	else begin
-		USER_OUT  <= '1;
+		// [MiSTer-DB9 BEGIN] - fall through to USER_OUT_DRIVE so the joydb OSD-open
+		// probe drives USER_IO for autodetect when UserIO Joystick=Off (joy_any_en=0,
+		// no SNAC; USER_OUT_DRIVE is idle-high while the probe is inactive -> no-op).
+		USER_OUT  <= USER_OUT_DRIVE;
+		// [MiSTer-DB9 END]
 		irq10Snac <= 1'b0;
 		ack       <= 1'b1;
 		Dat       <= 1'b1;
