@@ -455,9 +455,6 @@ parameter CONF_STR = {
 	"O[127:126],UserIO Joystick,Off,Saturn,DB9MD,DB15;",
 	"O[125],UserIO Players, 1 Player,2 Players;",
 	// [MiSTer-DB9-Pro END]
-	// [MiSTer-DB9 BEGIN] - SNAC8 Buttons Config selector
-	"O[124],Buttons Config.,Option 1,Option 2;",
-	// [MiSTer-DB9 END]
 	"-;",
 	"D8O[48:45],Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port1,Analog Joystick,Pop'n;",
 	"D8O[52:49],Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,SNAC-port2,Analog Joystick,Pop'n;",
@@ -652,35 +649,24 @@ wire [13:0] sat_psx_2 = {
 };
 // [MiSTer-DB9-Pro END]
 
-// [MiSTer-DB9 BEGIN] - joydb_1 → joy_unmod with Saturn arm + Buttons Config (status[124]) selector
+// [MiSTer-DB9 BEGIN] - joydb_1 → joy_unmod: Saturn arm (fixed) + DB9MD/DB15 remap matrix
+// Saturn keeps its fixed sat_psx_1 layout (SMPC/SNAC path; Saturn skips the matrix).
+// DB9MD/DB15 take joydb_1_mapped, whose CONF_STR-derived default (gamepad_defaults)
+// replaces the old status[124] "Buttons Config." swap; redefinable in OSD Define.
 wire [31:0] joy_unmod = joydb_1ena ?
 	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
 	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_1)} :
 	// [MiSTer-DB9-Pro END]
-	!status[124] ? {
-		// CZSMXABYUDLR
-		(OSD_STATUS? 32'b000000 : {joydb_1[6],joydb_1[9],joydb_1[10],joydb_1[11],joydb_1[7],joydb_1[4],joydb_1[5],joydb_1[8],joydb_1[3:0]})
-	} :
-	{
-		// C-Z-SMXABYUDLR
-		(OSD_STATUS? 32'b000000 : {joydb_1[6],1'b0,joydb_1[9],1'b0,joydb_1[10],joydb_1[11],joydb_1[7],joydb_1[4],joydb_1[5],joydb_1[8],joydb_1[3:0]})
-	}
+	(OSD_STATUS? 32'b000000 : joydb_1_mapped[11:0])
 : joy_unmod_USB;
 // [MiSTer-DB9 END]
 
-// [MiSTer-DB9 BEGIN] - joydb_2 → joy2 with Saturn arm + Buttons Config (status[124]) selector
+// [MiSTer-DB9 BEGIN] - joydb_2 → joy2: Saturn arm (fixed) + DB9MD/DB15 remap matrix
 wire [31:0] joy2 = joydb_2ena ?
 	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
 	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_2)} :
 	// [MiSTer-DB9-Pro END]
-	!status[124] ? {
-		// CZSMXABYUDLR
-		(OSD_STATUS? 32'b000000 : {joydb_2[6],joydb_2[9],joydb_2[10],joydb_2[11],joydb_2[7],joydb_2[4],joydb_2[5],joydb_2[8],joydb_2[3:0]})
-	} :
-	{
-		// C-Z-SMXABYUDLR
-		(OSD_STATUS? 32'b000000 : {joydb_2[6],1'b0,joydb_2[9],1'b0,joydb_2[10],joydb_2[11],joydb_2[7],joydb_2[4],joydb_2[5],joydb_2[8],joydb_2[3:0]})
-	}
+	(OSD_STATUS? 32'b000000 : joydb_2_mapped[11:0])
 : joydb_1ena ? joy_unmod_USB : joy2_USB;
 // [MiSTer-DB9 END]
 
