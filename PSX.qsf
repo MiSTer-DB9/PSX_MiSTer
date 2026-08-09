@@ -51,6 +51,12 @@ set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
 set_global_assignment -name PLACEMENT_EFFORT_MULTIPLIER 1.0
 set_global_assignment -name SEED 1
 
+# [MiSTer-DB9 BEGIN] - DB9 block pushes this core to 99% ALM, where the router
+# ran out of resources (Critical Warning 188026 / Error 11802) on every seed.
+# Quartus' documented remedy for that congestion.
+set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS
+# [MiSTer-DB9 END]
+
 set_global_assignment -name VERILOG_MACRO "MISTER_FB=1"
 
 # disable bilinear filtering when downscaling
