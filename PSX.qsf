@@ -55,6 +55,12 @@ set_global_assignment -name SEED 1
 # ran out of resources (Critical Warning 188026 / Error 11802) on every seed.
 # Quartus' documented remedy for that congestion.
 set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS
+# Upstream cd17b5a (CD SPT pause model) grew the core past the 4,191-LAB
+# ceiling (fitter asked 4195..4210 LABs on every seed; packing effort,
+# BALANCED mode and register-duplication OFF do not recover it). AREA
+# synthesis does: 40,823 / 41,910 ALMs (97%), hold clean, pll_hdmi setup
+# slack improved, general[2] at -0.005 ns. Same fix as Saturn.qsf.
+set_global_assignment -name OPTIMIZATION_TECHNIQUE AREA
 # [MiSTer-DB9 END]
 
 set_global_assignment -name VERILOG_MACRO "MISTER_FB=1"
