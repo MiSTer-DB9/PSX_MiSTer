@@ -666,7 +666,7 @@ wire [31:0] joy_unmod = joydb_1ena ?
 	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
 	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_1)} :
 	// [MiSTer-DB9-Pro END]
-	(OSD_STATUS? 32'b000000 : joydb_1_mapped[11:0])
+	(OSD_STATUS? 32'b000000 : joydb_1_mapped[12:0])
 : joy_unmod_USB;
 // [MiSTer-DB9 END]
 
@@ -675,7 +675,7 @@ wire [31:0] joy2 = joydb_2ena ?
 	// [MiSTer-DB9-Pro BEGIN] - Saturn arm
 	joy_saturn_en ? {18'b0, (OSD_STATUS ? 14'b0 : sat_psx_2)} :
 	// [MiSTer-DB9-Pro END]
-	(OSD_STATUS? 32'b000000 : joydb_2_mapped[11:0])
+	(OSD_STATUS? 32'b000000 : joydb_2_mapped[12:0])
 : joydb_1ena ? joy_unmod_USB : joy2_USB;
 // [MiSTer-DB9 END]
 
